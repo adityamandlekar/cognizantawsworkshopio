@@ -1,0 +1,286 @@
+{
+    "AWSTemplateFormatVersion": "2010-09-09",
+    "Description": "Setting up codebuild job for smoke testing",
+    "Resources": {
+        "wrkshpcodebuildRoleSmoke": {
+            "Type": "AWS::IAM::Role",
+            "Properties": {
+                "AssumeRolePolicyDocument": {
+                    "Version": "2012-10-17",
+                    "Statement": [
+                        {
+                            "Effect": "Allow",
+                            "Principal": {
+                                "Service": [
+                                    "codebuild.amazonaws.com",
+                                    "codedeploy.amazonaws.com"
+                                ]
+                            },
+                            "Action": [
+                                "sts:AssumeRole"
+                            ]
+                        }
+                    ]
+                },
+                "Path": "/",
+                "Policies": [
+                    {
+                        "PolicyName": "workshopcodebuildpolicy",
+                        "PolicyDocument": {
+                            "Version": "2012-10-17",
+                            "Statement": [
+                                {
+                                    "Effect": "Allow",
+                                    "Action": "*",
+                                    "Resource": "*"
+                                }
+                            ]
+                        }
+                    }
+                ]
+            }
+        },
+        "wrkshpcodepipelinerole": {
+            "Type": "AWS::IAM::Role",
+            "Properties": {
+                "AssumeRolePolicyDocument": {
+                    "Version": "2012-10-17",
+                    "Statement": [
+                        {
+                            "Effect": "Allow",
+                            "Principal": {
+                                "Service": [
+                                    "codepipeline.amazonaws.com"
+                                ]
+                            },
+                            "Action": [
+                                "sts:AssumeRole"
+                            ]
+                        }
+                    ]
+                },
+                "Path": "/",
+                "Policies": [
+                    {
+                        "PolicyName": "codepipelinepolicyE2E",
+                        "PolicyDocument": {
+                            "Version": "2012-10-17",
+                            "Statement": [
+                                {
+                                    "Effect": "Allow",
+                                    "Action": "*",
+                                    "Resource": "*"
+                                }
+                            ]
+                        }
+                    }
+                ]
+            }
+        },
+        "DeployToTest": {
+            "Type": "AWS::CodeBuild::Project",
+            "Properties": {
+                "Artifacts": {
+                    "Location": {
+                        "Fn::ImportValue": "bucketname"
+                    },
+                    "Name": "/",
+                    "Type": "S3"
+                },
+                "Description": "This build is for DeployToTest created through cfn",
+                "Environment": {
+                    "ComputeType": "BUILD_GENERAL1_MEDIUM",
+                    "Image": "aws/codebuild/standard:4.0",
+                    "PrivilegedMode": "True",
+                    "Type": "LINUX_CONTAINER"
+                },
+                "LogsConfig": {
+                    "CloudWatchLogs": {
+                        "Status": "ENABLED"
+                    },
+                    "S3Logs": {
+                        "Status": "DISABLED"
+                    }
+                },
+                "Name": "DeployToTest",
+                "QueuedTimeoutInMinutes": 480,
+                "ServiceRole": {
+                    "Ref": "wrkshpcodebuildRoleSmoke"
+                },
+                "Source": {
+                    "Location": {
+                        "Fn::ImportValue": "wrkshpfunctionalAssuranceRepo"
+                    },
+                    "BuildSpec": "deploytotest_buildspec.yml",
+                    "Type": "CODECOMMIT",
+                    "GitCloneDepth": 1
+                },
+                "SourceVersion": "refs/heads/master",
+                "TimeoutInMinutes": 60
+            }
+        },
+        "PostDeploySmokeTesting": {
+            "Type": "AWS::CodeBuild::Project",
+            "Properties": {
+                "Artifacts": {
+                    "Location": {
+                        "Fn::ImportValue": "bucketname"
+                    },
+                    "Name": "/",
+                    "Type": "S3"
+                },
+                "VpcConfig": {
+                    "SecurityGroupIds": [
+                        {
+                            "Fn::ImportValue": "securitygroup"
+                        }
+                    ],
+                    "Subnets": [
+                        {
+                            "Fn::ImportValue": "wrkshpPrivateSubnet"
+                        }
+                    ],
+                    "VpcId": {
+                        "Fn::ImportValue": "wrkshpVPC"
+                    }
+                },
+                "Description": "This build is for Smoke Testing created through cfn",
+                "Environment": {
+                    "ComputeType": "BUILD_GENERAL1_MEDIUM",
+                    "Image": "aws/codebuild/standard:4.0",
+                    "PrivilegedMode": "True",
+                    "Type": "LINUX_CONTAINER"
+                },
+                "LogsConfig": {
+                    "CloudWatchLogs": {
+                        "Status": "ENABLED"
+                    },
+                    "S3Logs": {
+                        "Status": "DISABLED"
+                    }
+                },
+                "Name": "PostDeploySmokeTesting",
+                "QueuedTimeoutInMinutes": 480,
+                "ServiceRole": {
+                    "Ref": "wrkshpcodebuildRoleSmoke"
+                },
+                "Source": {
+                    "Location": {
+                        "Fn::ImportValue": "wrkshpfunctionalAssuranceRepo"
+                    },
+                    "Type": "CODECOMMIT",
+                    "BuildSpec": "funcassur_stage2_smoke_buildspec.yml",
+                    "GitCloneDepth": 1
+                },
+                "SourceVersion": "refs/heads/master",
+                "TimeoutInMinutes": 60
+            }
+        },
+        "CodePipeline": {
+            "DependsOn": [
+                "wrkshpcodepipelinerole"
+            ],
+            "Type": "AWS::CodePipeline::Pipeline",
+            "Properties": {
+                "ArtifactStore": {
+                    "Location": {
+                        "Fn::ImportValue": "bucketname"
+                    },
+                    "Type": "S3"
+                },
+                "Name": "workshop_codepipeline_PostBuildQA",
+                "RoleArn": {
+                    "Fn::GetAtt": [
+                        "wrkshpcodepipelinerole",
+                        "Arn"
+                    ]
+                },
+                "Stages": [
+                    {
+                        "Actions": [
+                            {
+                                "OutputArtifacts": [
+                                    {
+                                        "Name": "functional-assurance"
+                                    }
+                                ],
+                                "InputArtifacts": [],
+                                "Configuration": {
+                                    "RepositoryName": "awswrkshp-functional-assurance",
+                                    "BranchName": "master",
+                                    "PollForSourceChanges": "false"
+                                },
+                                "RunOrder": 1,
+                                "ActionTypeId": {
+                                    "Category": "Source",
+                                    "Owner": "AWS",
+                                    "Provider": "CodeCommit",
+                                    "Version": "1"
+                                },
+                                "Name": "FunctionalAssurance"
+                            }
+                        ],
+                        "Name": "Source"
+                    },
+                    {
+                        "Actions": [
+                            {
+                                "InputArtifacts": [
+                                    {
+                                        "Name": "functional-assurance"
+                                    }
+                                ],
+                                "Configuration": {
+                                    "ProjectName": {
+                                        "Ref": "DeployToTest"
+                                    }
+                                },
+                                "RunOrder": 1,
+                                "Namespace": "BuildVariablesDeploy",
+                                "ActionTypeId": {
+                                    "Category": "Build",
+                                    "Owner": "AWS",
+                                    "Provider": "CodeBuild",
+                                    "Version": "1"
+                                },
+                                "Name": "DeployToTest"
+                            }
+                        ],
+                        "Name": "DeployToTest"
+                    },
+                    {
+                        "Actions": [
+                            {
+                                "OutputArtifacts": [
+                                    {
+                                        "Name": "BuildArtifact_Smoke"
+                                    }
+                                ],
+                                "InputArtifacts": [
+                                    {
+                                        "Name": "functional-assurance"
+                                    }
+                                ],
+                                "Configuration": {
+                                    "ProjectName": {
+                                        "Ref": "PostDeploySmokeTesting"
+                                    }
+                                },
+                                "RunOrder": 1,
+                                "Namespace": "BuildVariablesSmoke",
+                                "ActionTypeId": {
+                                    "Category": "Build",
+                                    "Owner": "AWS",
+                                    "Provider": "CodeBuild",
+                                    "Version": "1"
+                                },
+                                "Name": "PostBuildQA"
+                            }
+                        ],
+                        "Name": "PostBuildQA"
+                    }
+                ]
+            }
+        }
+    }
+}

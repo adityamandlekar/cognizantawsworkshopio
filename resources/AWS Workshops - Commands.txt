@@ -1,0 +1,26 @@
+aws cloudformation  create-stack --stack-name PreBuildQA --template-url https://aws-wrkshp-artifacts.s3-eu-west-1.amazonaws.com/awsworkshop_infrastructure_artefacts/awsworkshop_prebuild_qa.json --capabilities CAPABILITY_NAMED_IAM
+
+
+
+aws cloudformation  create-stack --stack-name PostBuildQA --template-url https://aws-wrkshp-artifacts.s3-eu-west-1.amazonaws.com/awsworkshop_infrastructure_artefacts/awsworkshop_postbuild_qa.json --capabilities CAPABILITY_NAMED_IAM
+
+
+
+aws cloudformation  create-stack --stack-name FunctionalAssurance --template-url https://aws-wrkshp-artifacts.s3-eu-west-1.amazonaws.com/awsworkshop_infrastructure_artefacts/awsworkshop_functional_assurance.json --capabilities CAPABILITY_NAMED_IAM
+
+
+
+aws cloudformation  create-stack --stack-name ExperienceAssurance --template-url https://aws-wrkshp-artifacts.s3-eu-west-1.amazonaws.com/awsworkshop_infrastructure_artefacts/awsworkshop_experience_assurance.json --capabilities CAPABILITY_NAMED_IAM
+
+
+aws cloudformation  create-stack --stack-name E2EAssurance --template-url https://aws-wrkshp-artifacts.s3-eu-west-1.amazonaws.com/awsworkshop_infrastructure_artefacts/awsworkshop_e2e_assurance.json --capabilities CAPABILITY_NAMED_IAM
+
+
+SONARQube:
+http://52.86.64.213:9000
+
+Report:
+http://52.86.64.213:3337
+
+Front-End URL:
+http://awswrkshpfrontendalbLoadBalancer-110375818.us-east-1.elb.amazonaws.com:3000
