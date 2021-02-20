@@ -24,3 +24,11 @@ http://52.86.64.213:3337
 
 Front-End URL:
 http://awswrkshpfrontendalbLoadBalancer-110375818.us-east-1.elb.amazonaws.com:3000
+
+Clean Up :
+
+wget https://aws-wrkshp-artifacts.s3-eu-west-1.amazonaws.com/awsworkshop_infrastructure_artefacts/awsworskhop_cleanup_environment.sh
+
+chmod +x awsworskhop_cleanup_environment.sh
+
+./awsworskhop_cleanup_environment.sh
