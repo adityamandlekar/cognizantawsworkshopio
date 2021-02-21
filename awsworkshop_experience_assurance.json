@@ -1,0 +1,386 @@
+{
+	"AWSTemplateFormatVersion": "2010-09-09",
+	"Description": "AWS CloudFormation Template to setup Codepipeline for awswrkshp Experience Assurance.",
+	"Resources": {
+		"wrkshpcodebuildRolenft": {
+			"Type": "AWS::IAM::Role",
+			"Properties": {
+				"AssumeRolePolicyDocument": {
+					"Version": "2012-10-17",
+					"Statement": [
+						{
+							"Effect": "Allow",
+							"Principal": {
+								"Service": [
+									"codebuild.amazonaws.com",
+									"codedeploy.amazonaws.com"
+								]
+							},
+							"Action": [
+								"sts:AssumeRole"
+							]
+						}
+					]
+				},
+				"Path": "/",
+				"Policies": [
+					{
+						"PolicyName": "workshopcodebuildpolicy",
+						"PolicyDocument": {
+							"Version": "2012-10-17",
+							"Statement": [
+								{
+									"Effect": "Allow",
+									"Action": "*",
+									"Resource": "*"
+								}
+							]
+						}
+					}
+				]
+			}
+		},
+		"awswrkshpPerformanceTesting": {
+			"DependsOn": [
+				"wrkshpcodebuildRolenft"
+			],
+			"Type": "AWS::CodeBuild::Project",
+			"Properties": {
+				"Artifacts": {
+					"Location": {
+						"Fn::ImportValue": "bucketname"
+					},
+					"Name": "/",
+					"Type": "S3"
+				},
+				"Description": "This build is for performance testing created through cfn",
+				"Environment": {
+					"ComputeType": "BUILD_GENERAL1_MEDIUM",
+					"Image": "aws/codebuild/amazonlinux2-x86_64-standard:3.0",
+					"PrivilegedMode": "True",
+					"Type": "LINUX_CONTAINER"
+				},
+				"LogsConfig": {
+					"CloudWatchLogs": {
+						"Status": "ENABLED"
+					},
+					"S3Logs": {
+						"Status": "DISABLED"
+					}
+				},
+				"Name": "awswrkshp_performance_testing",
+				"QueuedTimeoutInMinutes": 480,
+				"ServiceRole": {
+					"Ref": "wrkshpcodebuildRolenft"
+				},
+				"Source": {
+					"Location": {
+						"Fn::ImportValue": "wrkshpPerformanceTestsRepo"
+					},
+					"Type": "CODECOMMIT",
+					"GitCloneDepth": 1
+				},
+				"SourceVersion": "refs/heads/master",
+				"TimeoutInMinutes": 60
+			}
+		},
+		"awswrkshpSecurityTesting": {
+			"DependsOn": [
+				"wrkshpcodebuildRolenft"
+			],
+			"Type": "AWS::CodeBuild::Project",
+			"Properties": {
+				"Artifacts": {
+					"Location": {
+						"Fn::ImportValue": "bucketname"
+					},
+					"Name": "/",
+					"Type": "S3"
+				},
+				"Description": "This build is for security testing created through cfn",
+				"Environment": {
+					"ComputeType": "BUILD_GENERAL1_MEDIUM",
+					"Image": "aws/codebuild/amazonlinux2-x86_64-standard:3.0",
+					"PrivilegedMode": "True",
+					"Type": "LINUX_CONTAINER"
+				},
+				"LogsConfig": {
+					"CloudWatchLogs": {
+						"Status": "ENABLED"
+					},
+					"S3Logs": {
+						"Status": "DISABLED"
+					}
+				},
+				"Name": "awswrkshp_security_testing",
+				"QueuedTimeoutInMinutes": 480,
+				"ServiceRole": {
+					"Ref": "wrkshpcodebuildRolenft"
+				},
+				"Source": {
+					"Location": {
+						"Fn::ImportValue": "wrkshpSecurityTestsRepo"
+					},
+					"Type": "CODECOMMIT",
+					"GitCloneDepth": 1
+				},
+				"SourceVersion": "refs/heads/master",
+				"TimeoutInMinutes": 60
+			}
+		},
+		"awswrkshpAccessibilityTesting": {
+			"DependsOn": [
+				"wrkshpcodebuildRolenft"
+			],
+			"Type": "AWS::CodeBuild::Project",
+			"Properties": {
+				"Artifacts": {
+					"Location": {
+						"Fn::ImportValue": "bucketname"
+					},
+					"Name": "/",
+					"Type": "S3"
+				},
+				"Description": "This build is for accessibility testing created through cfn",
+				"Environment": {
+					"ComputeType": "BUILD_GENERAL1_MEDIUM",
+					"Image": "aws/codebuild/standard:4.0",
+					"PrivilegedMode": "True",
+					"Type": "LINUX_CONTAINER"
+				},
+				"LogsConfig": {
+					"CloudWatchLogs": {
+						"Status": "ENABLED"
+					},
+					"S3Logs": {
+						"Status": "DISABLED"
+					}
+				},
+				"Name": "awswrkshp_accessibility_testing",
+				"QueuedTimeoutInMinutes": 480,
+				"ServiceRole": {
+					"Ref": "wrkshpcodebuildRolenft"
+				},
+				"Source": {
+					"Location": {
+						"Fn::ImportValue": "wrkshpAccessibilityTestsRepo"
+					},
+					"Type": "CODECOMMIT",
+					"GitCloneDepth": 1
+				},
+				"SourceVersion": "refs/heads/master",
+				"TimeoutInMinutes": 60
+			}
+		},
+		"wrkshpcodepipelinerolenft": {
+			"Type": "AWS::IAM::Role",
+			"Properties": {
+				"AssumeRolePolicyDocument": {
+					"Version": "2012-10-17",
+					"Statement": [
+						{
+							"Effect": "Allow",
+							"Principal": {
+								"Service": [
+									"codepipeline.amazonaws.com"
+								]
+							},
+							"Action": [
+								"sts:AssumeRole"
+							]
+						}
+					]
+				},
+				"Path": "/",
+				"Policies": [
+					{
+						"PolicyName": "codepipelinepolicy",
+						"PolicyDocument": {
+							"Version": "2012-10-17",
+							"Statement": [
+								{
+									"Effect": "Allow",
+									"Action": "*",
+									"Resource": "*"
+								}
+							]
+						}
+					}
+				]
+			}
+		},
+		"CodePipeline": {
+			"DependsOn": [
+				"wrkshpcodepipelinerolenft"
+			],
+			"Type": "AWS::CodePipeline::Pipeline",
+			"Properties": {
+				"ArtifactStore": {
+					"Location": {
+						"Fn::ImportValue": "bucketname"
+					},
+					"Type": "S3"
+				},
+				"Name": "codepipeline_experience_assurance",
+				"RoleArn": {
+					"Fn::GetAtt": [
+						"wrkshpcodepipelinerolenft",
+						"Arn"
+					]
+				},
+				"Stages": [
+					{
+						"Actions": [
+							{
+								"OutputArtifacts": [
+									{
+										"Name": "SourceArtifact_Performance"
+									}
+								],
+								"InputArtifacts": [],
+								"Configuration": {
+									"RepositoryName": "awswrkshp-tests-performance",
+									"BranchName": "master",
+									"PollForSourceChanges": "true"
+								},
+								"RunOrder": 1,
+								"Namespace": "SourceVariables",
+								"ActionTypeId": {
+									"Category": "Source",
+									"Owner": "AWS",
+									"Provider": "CodeCommit",
+									"Version": "1"
+								},
+								"Name": "Source_Performance"
+							},
+							{
+								"OutputArtifacts": [
+									{
+										"Name": "SourceArtifact_Security"
+									}
+								],
+								"InputArtifacts": [],
+								"Configuration": {
+									"RepositoryName": "awswrkshp-tests-security",
+									"BranchName": "master",
+									"PollForSourceChanges": "true"
+								},
+								"RunOrder": 1,
+								"ActionTypeId": {
+									"Category": "Source",
+									"Owner": "AWS",
+									"Provider": "CodeCommit",
+									"Version": "1"
+								},
+								"Name": "Source_Security"
+							},
+							{
+								"OutputArtifacts": [
+									{
+										"Name": "SourceArtifact_Accessibility"
+									}
+								],
+								"InputArtifacts": [],
+								"Configuration": {
+									"RepositoryName": "awswrkshp-tests-accessibility",
+									"BranchName": "master",
+									"PollForSourceChanges": "true"
+								},
+								"RunOrder": 1,
+								"ActionTypeId": {
+									"Category": "Source",
+									"Owner": "AWS",
+									"Provider": "CodeCommit",
+									"Version": "1"
+								},
+								"Name": "Source_Accessibility"
+							}
+						],
+						"Name": "SourceStage"
+					},
+					{
+						"Actions": [
+							{
+								"OutputArtifacts": [
+									{
+										"Name": "BuildArtifact_Performance"
+									}
+								],
+								"InputArtifacts": [
+									{
+										"Name": "SourceArtifact_Performance"
+									}
+								],
+								"Configuration": {
+									"ProjectName": {
+										"Ref": "awswrkshpPerformanceTesting"
+									}
+								},
+								"RunOrder": 1,
+								"Namespace": "BuildVariables",
+								"ActionTypeId": {
+									"Category": "Build",
+									"Owner": "AWS",
+									"Provider": "CodeBuild",
+									"Version": "1"
+								},
+								"Name": "Build_Performance_Testing"
+							},
+							{
+								"OutputArtifacts": [
+									{
+										"Name": "BuildArtifact_Security"
+									}
+								],
+								"InputArtifacts": [
+									{
+										"Name": "SourceArtifact_Security"
+									}
+								],
+								"Configuration": {
+									"ProjectName": {
+										"Ref": "awswrkshpSecurityTesting"
+									}
+								},
+								"RunOrder": 2,
+								"ActionTypeId": {
+									"Category": "Build",
+									"Owner": "AWS",
+									"Provider": "CodeBuild",
+									"Version": "1"
+								},
+								"Name": "Build_Security_Testing"
+							},
+							{
+								"OutputArtifacts": [
+									{
+										"Name": "BuildArtifact_Accessibility"
+									}
+								],
+								"InputArtifacts": [
+									{
+										"Name": "SourceArtifact_Accessibility"
+									}
+								],
+								"Configuration": {
+									"ProjectName": {
+										"Ref": "awswrkshpAccessibilityTesting"
+									}
+								},
+								"RunOrder": 3,
+								"ActionTypeId": {
+									"Category": "Build",
+									"Owner": "AWS",
+									"Provider": "CodeBuild",
+									"Version": "1"
+								},
+								"Name": "Build_Accessibility_Testing"
+							}
+						],
+						"Name": "Build"
+					}
+				]
+			}
+		}
+	}
+}

@@ -1,0 +1,7 @@
+1.Integrate your pipeline with Slack channel to trigger and monitor the execution from Slack interface rather than Cloud9 (or) AWS console
+2.Replace (or) append the tooling stack by creating your own automation test with new tools and frameworks
+3.Implement Code progression in the pipelines to demonstrate how code base moves form Dev to Production based on the quality gates at every stage
+4.Execute your mobile testing on AWS Device Farm
+5.Add additional testing types such as integration testing and UAT before releasing the code to production
+6.Integrate AI based BOTS for intelligent test execution based on the code committed and possible business impact.
+7.Re-orchestrate your pipeline by shifting left the non-functional testing i.e. execute the experience assurance at the Pre-Build stage itself

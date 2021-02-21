@@ -1,0 +1,760 @@
+{
+    "AWSTemplateFormatVersion": "2010-09-09",
+    "Description": "AWS CloudFormation Template to setup Codepipeline for awswrkshp prebuildqualitycheck frontend and backend",
+    "Resources": {
+        "wrkshpcodebuildRole": {
+            "Type": "AWS::IAM::Role",
+            "Properties": {
+                "AssumeRolePolicyDocument": {
+                    "Version": "2012-10-17",
+                    "Statement": [
+                        {
+                            "Effect": "Allow",
+                            "Principal": {
+                                "Service": [
+                                    "codebuild.amazonaws.com",
+                                    "codedeploy.amazonaws.com"
+                                ]
+                            },
+                            "Action": [
+                                "sts:AssumeRole"
+                            ]
+                        }
+                    ]
+                },
+                "Path": "/",
+                "Policies": [
+                    {
+                        "PolicyName": "workshopcodebuildpolicy",
+                        "PolicyDocument": {
+                            "Version": "2012-10-17",
+                            "Statement": [
+                                {
+                                    "Effect": "Allow",
+                                    "Action": "*",
+                                    "Resource": "*"
+                                }
+                            ]
+                        }
+                    }
+                ]
+            }
+        },
+        "wrkshpcodepipelinerole": {
+            "Type": "AWS::IAM::Role",
+            "Properties": {
+                "AssumeRolePolicyDocument": {
+                    "Version": "2012-10-17",
+                    "Statement": [
+                        {
+                            "Effect": "Allow",
+                            "Principal": {
+                                "Service": [
+                                    "codepipeline.amazonaws.com"
+                                ]
+                            },
+                            "Action": [
+                                "sts:AssumeRole"
+                            ]
+                        }
+                    ]
+                },
+                "Path": "/",
+                "Policies": [
+                    {
+                        "PolicyName": "codepipelinepolicy",
+                        "PolicyDocument": {
+                            "Version": "2012-10-17",
+                            "Statement": [
+                                {
+                                    "Effect": "Allow",
+                                    "Action": "*",
+                                    "Resource": "*"
+                                }
+                            ]
+                        }
+                    }
+                ]
+            }
+        },
+        "Cloudwatchfrontendgroup": {
+            "Type": "AWS::Logs::LogGroup",
+            "Properties": {
+                "LogGroupName": "frontend",
+                "RetentionInDays": 365
+            }
+        },
+        "Cloudwatchsonarteststream": {
+            "Type": "AWS::Logs::LogStream",
+            "Properties": {
+                "LogGroupName": {
+                    "Ref": "Cloudwatchfrontendgroup"
+                },
+                "LogStreamName": "sonartest"
+            }
+        },
+        "Cloudwatchsonarqubegroup": {
+            "Type": "AWS::Logs::LogGroup",
+            "Properties": {
+                "LogGroupName": "sonarqube",
+                "RetentionInDays": 365
+            }
+        },
+        "Cloudwatchspringbootstream": {
+            "Type": "AWS::Logs::LogStream",
+            "Properties": {
+                "LogGroupName": {
+                    "Ref": "Cloudwatchsonarqubegroup"
+                },
+                "LogStreamName": "springboot"
+            }
+        },
+        "Cloudwatchbuildgroup": {
+            "Type": "AWS::Logs::LogGroup",
+            "Properties": {
+                "LogGroupName": "/aws/frontend/codebuild",
+                "RetentionInDays": 365
+            }
+        },
+        "CloudwatchreactAppstream": {
+            "Type": "AWS::Logs::LogStream",
+            "Properties": {
+                "LogGroupName": {
+                    "Ref": "Cloudwatchbuildgroup"
+                },
+                "LogStreamName": "reactApp"
+            }
+        },
+        "SonarQubeReactApp": {
+            "Type": "AWS::CodeBuild::Project",
+            "DependsOn": "wrkshpcodebuildRole",
+            "Properties": {
+                "Artifacts": {
+                    "Location": {
+                        "Fn::ImportValue": "bucketname"
+                    },
+                    "Name": "/",
+                    "Type": "S3"
+                },
+                "VpcConfig": {
+                    "SecurityGroupIds": [
+                        {
+                            "Fn::ImportValue": "securitygroup"
+                        }
+                    ],
+                    "Subnets": [
+                        {
+                            "Fn::ImportValue": "wrkshpPrivateSubnet"
+                        }
+                    ],
+                    "VpcId": {
+                        "Fn::ImportValue": "wrkshpVPC"
+                    }
+                },
+                "Description": "This build is for SonarQubeReactApp created through cfn",
+                "Environment": {
+                    "ComputeType": "BUILD_GENERAL1_MEDIUM",
+                    "Image": "aws/codebuild/standard:4.0",
+                    "PrivilegedMode": "True",
+                    "Type": "LINUX_CONTAINER"
+                },
+                "LogsConfig": {
+                    "CloudWatchLogs": {
+                        "Status": "ENABLED",
+                        "GroupName": {
+                            "Ref": "Cloudwatchfrontendgroup"
+                        },
+                        "StreamName": {
+                            "Ref": "Cloudwatchsonarteststream"
+                        }
+                    },
+                    "S3Logs": {
+                        "Status": "DISABLED"
+                    }
+                },
+                "Name": "workshop_SonarQubeReactApp",
+                "QueuedTimeoutInMinutes": 480,
+                "ServiceRole": {
+                    "Ref": "wrkshpcodebuildRole"
+                },
+                "Source": {
+                    "Location": {
+                        "Fn::ImportValue": "wrkshpfrontendRepo"
+                    },
+                    "Type": "CODECOMMIT",
+                    "BuildSpec": "prebuild-stage2-frontend-buildspec.yml",
+                    "GitCloneDepth": 1
+                },
+                "SourceVersion": "refs/heads/master",
+                "TimeoutInMinutes": 60
+            }
+        },
+        "SonarQubeSpringBoot": {
+            "Type": "AWS::CodeBuild::Project",
+            "DependsOn": "wrkshpcodebuildRole",
+            "Properties": {
+                "Artifacts": {
+                    "Location": {
+                        "Fn::ImportValue": "bucketname"
+                    },
+                    "Name": "/",
+                    "Type": "S3"
+                },
+                "VpcConfig": {
+                    "SecurityGroupIds": [
+                        {
+                            "Fn::ImportValue": "securitygroup"
+                        }
+                    ],
+                    "Subnets": [
+                        {
+                            "Fn::ImportValue": "wrkshpPrivateSubnet"
+                        }
+                    ],
+                    "VpcId": {
+                        "Fn::ImportValue": "wrkshpVPC"
+                    }
+                },
+                "Description": "This build is for SonarQube-SpringBoot created through cfn",
+                "Environment": {
+                    "ComputeType": "BUILD_GENERAL1_MEDIUM",
+                    "Image": "aws/codebuild/standard:4.0",
+                    "PrivilegedMode": "True",
+                    "Type": "LINUX_CONTAINER"
+                },
+                "LogsConfig": {
+                    "CloudWatchLogs": {
+                        "Status": "ENABLED",
+                        "GroupName": {
+                            "Ref": "Cloudwatchsonarqubegroup"
+                        },
+                        "StreamName": {
+                            "Ref": "Cloudwatchspringbootstream"
+                        }
+                    },
+                    "S3Logs": {
+                        "Status": "DISABLED"
+                    }
+                },
+                "Name": "workshop_SonarQubeSpringBoot",
+                "QueuedTimeoutInMinutes": 480,
+                "ServiceRole": {
+                    "Ref": "wrkshpcodebuildRole"
+                },
+                "Source": {
+                    "Location": {
+                        "Fn::ImportValue": "wrkshpbackendRepo"
+                    },
+                    "BuildSpec": "prebuild-stage2-backend-buildspec.yml",
+                    "Type": "CODECOMMIT",
+                    "GitCloneDepth": 1
+                },
+                "SourceVersion": "refs/heads/master",
+                "TimeoutInMinutes": 60
+            }
+        },
+        "UnitTestReactApp": {
+            "Type": "AWS::CodeBuild::Project",
+            "DependsOn": "wrkshpcodebuildRole",
+            "Properties": {
+                "Artifacts": {
+                    "Location": {
+                        "Fn::ImportValue": "bucketname"
+                    },
+                    "Name": "/",
+                    "Type": "S3"
+                },
+                "VpcConfig": {
+                    "SecurityGroupIds": [
+                        {
+                            "Fn::ImportValue": "securitygroup"
+                        }
+                    ],
+                    "Subnets": [
+                        {
+                            "Fn::ImportValue": "wrkshpPrivateSubnet"
+                        }
+                    ],
+                    "VpcId": {
+                        "Fn::ImportValue": "wrkshpVPC"
+                    }
+                },
+                "Description": "This build is for UnitTest-ReactApp created through cfn",
+                "Environment": {
+                    "ComputeType": "BUILD_GENERAL1_MEDIUM",
+                    "Image": "aws/codebuild/standard:4.0",
+                    "PrivilegedMode": "True",
+                    "Type": "LINUX_CONTAINER"
+                },
+                "LogsConfig": {
+                    "CloudWatchLogs": {
+                        "Status": "ENABLED"
+                    },
+                    "S3Logs": {
+                        "Status": "DISABLED"
+                    }
+                },
+                "Name": "workshop_UnitTestReactApp",
+                "QueuedTimeoutInMinutes": 480,
+                "ServiceRole": {
+                    "Ref": "wrkshpcodebuildRole"
+                },
+                "Source": {
+                    "Location": {
+                        "Fn::ImportValue": "wrkshpfrontendRepo"
+                    },
+                    "Type": "CODECOMMIT",
+                    "BuildSpec": "prebuild-stage3-frontend-buildspec.yml",
+                    "GitCloneDepth": 1
+                },
+                "SourceVersion": "refs/heads/master",
+                "TimeoutInMinutes": 60
+            }
+        },
+        "SpringBootUnitTest": {
+            "Type": "AWS::CodeBuild::Project",
+            "DependsOn": "wrkshpcodebuildRole",
+            "Properties": {
+                "Artifacts": {
+                    "Location": {
+                        "Fn::ImportValue": "bucketname"
+                    },
+                    "Name": "/",
+                    "Type": "S3"
+                },
+                "VpcConfig": {
+                    "SecurityGroupIds": [
+                        {
+                            "Fn::ImportValue": "securitygroup"
+                        }
+                    ],
+                    "Subnets": [
+                        {
+                            "Fn::ImportValue": "wrkshpPrivateSubnet"
+                        }
+                    ],
+                    "VpcId": {
+                        "Fn::ImportValue": "wrkshpVPC"
+                    }
+                },
+                "Description": "This build is for SpringBootUnitTest created through cfn",
+                "Environment": {
+                    "ComputeType": "BUILD_GENERAL1_MEDIUM",
+                    "Image": "aws/codebuild/standard:4.0",
+                    "PrivilegedMode": "True",
+                    "Type": "LINUX_CONTAINER"
+                },
+                "LogsConfig": {
+                    "CloudWatchLogs": {
+                        "Status": "ENABLED"
+                    },
+                    "S3Logs": {
+                        "Status": "DISABLED"
+                    }
+                },
+                "Name": "workshop_SpringBootUnitTest",
+                "QueuedTimeoutInMinutes": 480,
+                "ServiceRole": {
+                    "Ref": "wrkshpcodebuildRole"
+                },
+                "Source": {
+                    "Location": {
+                        "Fn::ImportValue": "wrkshpbackendRepo"
+                    },
+                    "Type": "CODECOMMIT",
+                    "BuildSpec": "prebuild-stage3-backend-buildspec.yml",
+                    "GitCloneDepth": 1
+                },
+                "SourceVersion": "refs/heads/master",
+                "TimeoutInMinutes": 60
+            }
+        },
+        "awswrkshpfrontend": {
+            "Type": "AWS::CodeBuild::Project",
+            "DependsOn": "wrkshpcodebuildRole",
+            "Properties": {
+                "Artifacts": {
+                    "Location": {
+                        "Fn::ImportValue": "bucketname"
+                    },
+                    "Name": "/",
+                    "Type": "S3"
+                },
+                "VpcConfig": {
+                    "SecurityGroupIds": [
+                        {
+                            "Fn::ImportValue": "securitygroup"
+                        }
+                    ],
+                    "Subnets": [
+                        {
+                            "Fn::ImportValue": "wrkshpPrivateSubnet"
+                        }
+                    ],
+                    "VpcId": {
+                        "Fn::ImportValue": "wrkshpVPC"
+                    }
+                },
+                "Description": "This build is for awswrkshpfrontend created through cfn",
+                "Environment": {
+                    "ComputeType": "BUILD_GENERAL1_MEDIUM",
+                    "Image": "aws/codebuild/standard:4.0",
+                    "PrivilegedMode": "True",
+                    "Type": "LINUX_CONTAINER"
+                },
+                "LogsConfig": {
+                    "CloudWatchLogs": {
+                        "Status": "ENABLED",
+                        "GroupName": {
+                            "Ref": "Cloudwatchbuildgroup"
+                        },
+                        "StreamName": {
+                            "Ref": "CloudwatchreactAppstream"
+                        }
+                    },
+                    "S3Logs": {
+                        "Status": "DISABLED"
+                    }
+                },
+                "Name": "workshop_awswrkshpfrontend",
+                "QueuedTimeoutInMinutes": 480,
+                "ServiceRole": {
+                    "Ref": "wrkshpcodebuildRole"
+                },
+                "Source": {
+                    "Location": {
+                        "Fn::ImportValue": "wrkshpfrontendRepo"
+                    },
+                    "Type": "CODECOMMIT",
+                    "BuildSpec": "prebuild-stage4-frontend-buildspec.yml",
+                    "GitCloneDepth": 1
+                },
+                "SourceVersion": "refs/heads/master",
+                "TimeoutInMinutes": 60
+            }
+        },
+        "CodePipeline": {
+            "DependsOn": [
+                "wrkshpcodepipelinerole"
+            ],
+            "Type": "AWS::CodePipeline::Pipeline",
+            "Properties": {
+                "ArtifactStore": {
+                    "Location": {
+                        "Fn::ImportValue": "bucketname"
+                    },
+                    "Type": "S3"
+                },
+                "Name": "workshop_codepipeline_prebuildqualitycheck",
+                "RoleArn": {
+                    "Fn::GetAtt": [
+                        "wrkshpcodepipelinerole",
+                        "Arn"
+                    ]
+                },
+                "Stages": [
+                    {
+                        "Actions": [
+                            {
+                                "OutputArtifacts": [
+                                    {
+                                        "Name": "SourceArtifact"
+                                    }
+                                ],
+                                "InputArtifacts": [],
+                                "Namespace": "SourceVariables",
+                                "Configuration": {
+                                    "RepositoryName": "awswrkshp-aut-frontend",
+                                    "BranchName": "master",
+                                    "PollForSourceChanges": "true"
+                                },
+                                "RunOrder": 1,
+                                "ActionTypeId": {
+                                    "Category": "Source",
+                                    "Owner": "AWS",
+                                    "Provider": "CodeCommit",
+                                    "Version": "1"
+                                },
+                                "Name": "FrontEndReactApp"
+                            },
+                            {
+                                "OutputArtifacts": [
+                                    {
+                                        "Name": "SpringBootApp"
+                                    }
+                                ],
+                                "InputArtifacts": [],
+                                "Configuration": {
+                                    "RepositoryName": "awswrkshp-aut-backend",
+                                    "BranchName": "master",
+                                    "PollForSourceChanges": "false"
+                                },
+                                "RunOrder": 1,
+                                "ActionTypeId": {
+                                    "Category": "Source",
+                                    "Owner": "AWS",
+                                    "Provider": "CodeCommit",
+                                    "Version": "1"
+                                },
+                                "Name": "BackEndSpringBootApp"
+                            }
+                        ],
+                        "Name": "Source"
+                    },
+                    {
+                        "Actions": [
+                            {
+                                "OutputArtifacts": [],
+                                "InputArtifacts": [
+                                    {
+                                        "Name": "SourceArtifact"
+                                    }
+                                ],
+                                "Configuration": {
+                                    "ProjectName": {
+                                        "Ref": "SonarQubeReactApp"
+                                    }
+                                },
+                                "RunOrder": 1,
+                                "ActionTypeId": {
+                                    "Category": "Build",
+                                    "Owner": "AWS",
+                                    "Provider": "CodeBuild",
+                                    "Version": "1"
+                                },
+                                "Name": "ReactAppSonarCheck"
+                            },
+                            {
+                                "OutputArtifacts": [],
+                                "InputArtifacts": [
+                                    {
+                                        "Name": "SpringBootApp"
+                                    }
+                                ],
+                                "Configuration": {
+                                    "ProjectName": {
+                                        "Ref": "SonarQubeSpringBoot"
+                                    }
+                                },
+                                "RunOrder": 1,
+                                "ActionTypeId": {
+                                    "Category": "Build",
+                                    "Owner": "AWS",
+                                    "Provider": "CodeBuild",
+                                    "Version": "1"
+                                },
+                                "Name": "SpringBootSonarCheck"
+                            }
+                        ],
+                        "Name": "PreBuildQualityCheck"
+                    },
+                    {
+                        "Actions": [
+                            {
+                                "OutputArtifacts": [],
+                                "InputArtifacts": [
+                                    {
+                                        "Name": "SourceArtifact"
+                                    }
+                                ],
+                                "Configuration": {
+                                    "ProjectName": {
+                                        "Ref": "UnitTestReactApp"
+                                    }
+                                },
+                                "RunOrder": 1,
+                                "ActionTypeId": {
+                                    "Category": "Build",
+                                    "Owner": "AWS",
+                                    "Provider": "CodeBuild",
+                                    "Version": "1"
+                                },
+                                "Name": "ReactAppUnitTest"
+                            },
+                            {
+                                "OutputArtifacts": [],
+                                "InputArtifacts": [
+                                    {
+                                        "Name": "SpringBootApp"
+                                    }
+                                ],
+                                "Configuration": {
+                                    "ProjectName": {
+                                        "Ref": "SpringBootUnitTest"
+                                    }
+                                },
+                                "RunOrder": 1,
+                                "ActionTypeId": {
+                                    "Category": "Build",
+                                    "Owner": "AWS",
+                                    "Provider": "CodeBuild",
+                                    "Version": "1"
+                                },
+                                "Name": "SpringBootUnitTest"
+                            }
+                        ],
+                        "Name": "UnitTest"
+                    },
+                    {
+                        "Actions": [
+                            {
+                                "OutputArtifacts": [
+                                    {
+                                        "Name": "BuildArtifact"
+                                    }
+                                ],
+                                "InputArtifacts": [
+                                    {
+                                        "Name": "SourceArtifact"
+                                    }
+                                ],
+                                "Configuration": {
+                                    "ProjectName": {
+                                        "Ref": "awswrkshpfrontend"
+                                    }
+                                },
+                                "RunOrder": 1,
+                                "Namespace": "BuildVariables",
+                                "ActionTypeId": {
+                                    "Category": "Build",
+                                    "Owner": "AWS",
+                                    "Provider": "CodeBuild",
+                                    "Version": "1"
+                                },
+                                "Name": "FrontEndBuild"
+                            }
+                        ],
+                        "Name": "Build"
+                    },
+                    {
+                        "Actions": [
+                            {
+                                "OutputArtifacts": [],
+                                "InputArtifacts": [
+                                    {
+                                        "Name": "BuildArtifact"
+                                    }
+                                ],
+                                "Configuration": {
+                                    "ClusterName": {
+                                        "Fn::ImportValue": "cluster"
+                                    },
+                                    "ServiceName": "awswrkshpfrontendalb"
+                                },
+                                "RunOrder": 1,
+                                "ActionTypeId": {
+                                    "Category": "Deploy",
+                                    "Owner": "AWS",
+                                    "Provider": "ECS",
+                                    "Version": "1"
+                                },
+                                "Name": "FargateDeploy"
+                            },
+                            {
+                                "OutputArtifacts": [],
+                                "InputArtifacts": [
+                                    {
+                                        "Name": "BuildArtifact"
+                                    }
+                                ],
+                                "Configuration": {
+                                    "ClusterName": {
+                                        "Fn::ImportValue": "cluster"
+                                    },
+                                    "ServiceName": "awswrkshpFrntEndMock"
+                                },
+                                "RunOrder": 1,
+                                "ActionTypeId": {
+                                    "Category": "Deploy",
+                                    "Owner": "AWS",
+                                    "Provider": "ECS",
+                                    "Version": "1"
+                                },
+                                "Name": "awswrkshpFrntendMockFargateDeploy"
+                            }
+                        ],
+                        "Name": "DeployToFargate"
+                    }
+                ]
+            }
+        },
+        "wrkshpSecrets": {
+            "Type": "AWS::SecretsManager::Secret",
+            "Properties": {
+                "Name": "wrkshpSecretsPrebuildQA",
+                "SecretString": {
+                    "Fn::Join": [
+                        "",
+                        [
+                            "{\"imageURI\"",
+                            ":",
+                            "\"",
+                            {
+                                "Fn::Join": [
+                                    ".",
+                                    [
+                                        {
+                                            "Ref": "AWS::AccountId"
+                                        },
+                                        "dkr.ecr",
+                                        {
+                                            "Ref": "AWS::Region"
+                                        },
+                                        {
+                                            "Fn::Join": [
+                                                "/",
+                                                [
+                                                    "amazonaws.com",
+                                                    {
+                                                        "Fn::ImportValue": "ECRRepo"
+                                                    }
+                                                ]
+                                            ]
+                                        }
+                                    ]
+                                ]
+                            },
+                            "\"}"
+                        ]
+                    ]
+                }
+            }
+        }
+    },
+    "Outputs": {
+        "prebuildqualitycheckPipeline": {
+            "Description": "Created Pipeline Name",
+            "Value": {
+                "Ref": "CodePipeline"
+            }
+        },
+        "imageURI": {
+            "Description": "ECR Repository Path",
+            "Value": {
+                "Fn::Join": [
+                    ".",
+                    [
+                        {
+                            "Ref": "AWS::AccountId"
+                        },
+                        "dkr.ecr",
+                        {
+                            "Ref": "AWS::Region"
+                        },
+                        {
+                            "Fn::Join": [
+                                "/",
+                                [
+                                    "amazonaws.com",
+                                    {
+                                        "Fn::ImportValue": "ECRRepo"
+                                    }
+                                ]
+                            ]
+                        }
+                    ]
+                ]
+            }
+        }
+    }
+}
